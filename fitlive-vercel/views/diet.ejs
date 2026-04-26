@@ -1,0 +1,196 @@
+<%- include('partials/header', { title: 'Diet Tracker' }) %>
+<div class="app-layout">
+  <%- include('partials/sidebar') %>
+  <main class="main-content">
+    <%- include('partials/flash') %>
+
+    <div class="page-header">
+      <div class="page-title">Diet Tracker</div>
+    </div>
+
+    <!-- ── Add Meal Form with AI Auto-fill ── -->
+    <div class="panel" style="margin-bottom:20px">
+      <div class="panel-title">➕ Add Meal</div>
+
+      <!-- AI Auto-fill row -->
+      <div class="ai-autofill-bar">
+        <span class="ai-label">🤖 AI Auto-fill</span>
+        <input type="text" id="ai-food-input" class="ai-food-input">
+        <input type="text" id="ai-serving-input" class="ai-serving-input">
+        <button type="button" class="btn-ai" id="ai-fill-btn" onclick="autoFillNutrition()">
+          ✨ Auto-fill
+        </button>
+        <div id="ai-fill-status" class="ai-fill-status"></div>
+      </div>
+
+      <form action="/diet" method="POST" id="diet-form">
+        <div class="inline-form">
+          <div class="form-group" style="margin:0">
+            <label>Meal Name</label>
+            <input type="text" name="mealName" id="f-mealName" required>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label>Category</label>
+            <select name="category" id="f-category">
+              <option value="">Select</option>
+              <option>Breakfast</option>
+              <option>Lunch</option>
+              <option>Dinner</option>
+              <option>Snack</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label>Calories (kcal)</label>
+            <input type="number" name="calories" id="f-calories" min="0" required>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label>Protein (g)</label>
+            <input type="number" name="protein" id="f-protein" min="0" step="0.1">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label>Carbs (g)</label>
+            <input type="number" name="carbs" id="f-carbs" min="0" step="0.1">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label>Fats (g)</label>
+            <input type="number" name="fats" id="f-fats" min="0" step="0.1">
+          </div>
+          <div style="display:flex;align-items:flex-end">
+            <button type="submit" class="btn-add">Add Meal</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
+      <div class="stat-card">
+        <div class="stat-label">Today's Calories</div>
+        <div class="stat-value amber"><%= totalCals %></div>
+        <div class="stat-unit">kcal</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Protein</div>
+        <div class="stat-value green"><%= totalProtein.toFixed(1) %></div>
+        <div class="stat-unit">grams</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Carbohydrates</div>
+        <div class="stat-value blue"><%= totalCarbs.toFixed(1) %></div>
+        <div class="stat-unit">grams</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Fats</div>
+        <div class="stat-value red"><%= totalFats.toFixed(1) %></div>
+        <div class="stat-unit">grams</div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-title">📋 All Meals</div>
+        <% if (!meals.length) { %>
+          <div class="empty-state"><span>🥗</span>No meals logged yet.</div>
+        <% } else { %>
+          <div style="overflow-x:auto">
+            <table class="data-table">
+              <thead><tr><th>Meal</th><th>Category</th><th>Date</th><th>kcal</th><th>P/C/F</th><th></th></tr></thead>
+              <tbody>
+                <% meals.forEach(m => { %>
+                <tr>
+                  <td><strong><%= m.mealName %></strong></td>
+                  <td><span class="badge badge-green"><%= m.category %></span></td>
+                  <td style="color:var(--muted);font-size:0.8rem"><%= new Date(m.date).toLocaleDateString() %></td>
+                  <td><strong style="color:var(--amber)"><%= m.calories %></strong></td>
+                  <td style="color:var(--muted);font-size:0.8rem"><%= m.protein %>/<%= m.carbs %>/<%= m.fats %>g</td>
+                  <td>
+                    <form action="/diet/<%= m._id %>?_method=DELETE" method="POST">
+                      <button type="submit" class="btn-danger" onclick="return confirm('Remove meal?')">✕</button>
+                    </form>
+                  </td>
+                </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </div>
+      <div class="panel">
+        <div class="panel-title">🍽️ Macro Breakdown</div>
+        <div class="chart-wrap"><canvas id="chart-macro"></canvas></div>
+        <div class="legend-row">
+          <span style="color:var(--accent)">● Protein <%= totalProtein.toFixed(0) %>g</span>
+          <span style="color:var(--amber)">● Carbs <%= totalCarbs.toFixed(0) %>g</span>
+          <span style="color:var(--red)">● Fats <%= totalFats.toFixed(0) %>g</span>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+const macroData = { protein: <%= totalProtein %>, carbs: <%= totalCarbs %>, fats: <%= totalFats %> };
+
+// ── AI Auto-fill Nutrition ───────────────────────────
+async function autoFillNutrition() {
+  const foodName   = document.getElementById('ai-food-input').value.trim();
+  const serving    = document.getElementById('ai-serving-input').value.trim();
+  const btn        = document.getElementById('ai-fill-btn');
+  const status     = document.getElementById('ai-fill-status');
+
+  if (!foodName) {
+    status.textContent = '⚠️ Enter a food name first';
+    status.className   = 'ai-fill-status error';
+    return;
+  }
+
+  btn.textContent  = '⏳ Fetching...';
+  btn.disabled     = true;
+  status.textContent = '';
+
+  try {
+    const res  = await fetch('/ai/meal', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ foodName, servingSize: serving })
+    });
+    const data = await res.json();
+
+    if (data.error) {
+      status.textContent = '⚠️ ' + data.error;
+      status.className   = 'ai-fill-status error';
+      return;
+    }
+
+    const n = data.nutrition;
+    // Fill the form fields
+    document.getElementById('f-mealName').value = n.mealName;
+    document.getElementById('f-calories').value = n.calories;
+    document.getElementById('f-protein').value  = n.protein;
+    document.getElementById('f-carbs').value    = n.carbs;
+    document.getElementById('f-fats').value     = n.fats;
+
+    status.textContent = `✅ Filled! (${n.servingSize || 'per serving'})`;
+    status.className   = 'ai-fill-status success';
+
+    // Clear AI inputs
+    document.getElementById('ai-food-input').value   = '';
+    document.getElementById('ai-serving-input').value = '';
+
+  } catch (err) {
+    status.textContent = '⚠️ Network error. Enter manually.';
+    status.className   = 'ai-fill-status error';
+  } finally {
+    btn.textContent = '✨ Auto-fill';
+    btn.disabled    = false;
+  }
+}
+
+// Enter key in AI food input
+document.getElementById('ai-food-input').addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); autoFillNutrition(); }
+});
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="/js/diet.js"></script>
+<%- include('partials/footer') %>

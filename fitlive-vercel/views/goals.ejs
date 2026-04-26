@@ -1,0 +1,108 @@
+<%- include('partials/header', { title: 'Goals' }) %>
+<div class="app-layout">
+  <%- include('partials/sidebar') %>
+  <main class="main-content">
+    <%- include('partials/flash') %>
+
+    <div class="page-header"><div class="page-title">Fitness Goals</div></div>
+
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-title">➕ Set a Goal</div>
+        <form action="/goals" method="POST">
+          <div class="form-group">
+            <label>Goal Title</label>
+            <input type="text" name="title" required>
+          </div>
+          <div class="form-group">
+            <label>Category</label>
+            <select name="category" id="g-category">
+              <option value="">Select</option>
+              <option>Weight Loss</option>
+              <option>Weight Gain</option>
+              <option>Muscle Gain</option>
+              <option>Endurance</option>
+              <option>Steps</option>
+              <option>Calories</option>
+            </select>
+          </div>
+          <div class="two-col-sm">
+            <div class="form-group">
+              <label>Current Value</label>
+              <input type="number" name="currentValue" step="any" required>
+            </div>
+            <div class="form-group">
+              <label>Target Value</label>
+              <input type="number" name="targetValue" step="any" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Unit</label>
+            <input type="text" name="unit">
+          </div>
+          <div class="form-group">
+            <label>Deadline (optional)</label>
+            <input type="date" name="deadline">
+          </div>
+          <button type="submit" class="btn-add" style="width:100%">🎯 Set Goal</button>
+        </form>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">🎯 Active Goals</div>
+        <% const active = goals.filter(g => !g.achieved); %>
+        <% if (!active.length) { %>
+          <div class="empty-state"><span>🎯</span>No active goals. Set one!</div>
+        <% } else { %>
+          <% active.forEach(g => { %>
+          <div class="goal-item">
+            <div style="flex:1">
+              <div style="font-weight:600;margin-bottom:2px"><%= g.title %></div>
+              <div style="color:var(--muted);font-size:0.78rem">
+                <%= g.category %><% if (g.deadline) { %> · Due <%= new Date(g.deadline).toDateString() %><% } %>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;margin-top:7px">
+                <div class="progress-wrap" style="margin:0;flex:1">
+                  <div class="progress-fill" style="width:0%"></div>
+                </div>
+                <span style="font-size:0.8rem;color:var(--accent);white-space:nowrap">
+                  <%= g.currentValue %> → <%= g.targetValue %> <%= g.unit %>
+                </span>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-left:12px">
+              <form action="/goals/<%= g._id %>/achieve?_method=PUT" method="POST">
+                <button type="submit" class="btn-add" style="padding:6px 10px;font-size:0.78rem">✓</button>
+              </form>
+              <form action="/goals/<%= g._id %>?_method=DELETE" method="POST">
+                <button type="submit" class="btn-danger" onclick="return confirm('Delete?')">✕</button>
+              </form>
+            </div>
+          </div>
+          <% }) %>
+        <% } %>
+      </div>
+    </div>
+
+    <% const achieved = goals.filter(g => g.achieved); %>
+    <% if (achieved.length) { %>
+    <div class="panel">
+      <div class="panel-title">🏆 Achieved Goals</div>
+      <table class="data-table">
+        <thead><tr><th>Title</th><th>Category</th><th>Target</th></tr></thead>
+        <tbody>
+          <% achieved.forEach(g => { %>
+          <tr>
+            <td><strong style="color:var(--accent)">✓ <%= g.title %></strong></td>
+            <td><span class="badge badge-green"><%= g.category %></span></td>
+            <td><%= g.targetValue %> <%= g.unit %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+
+  </main>
+</div>
+<%- include('partials/footer') %>

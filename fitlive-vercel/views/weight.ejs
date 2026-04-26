@@ -1,0 +1,132 @@
+<%- include('partials/header', { title: 'Weight & BMI' }) %>
+<div class="app-layout">
+  <%- include('partials/sidebar') %>
+  <main class="main-content">
+    <%- include('partials/flash') %>
+
+    <div class="page-header">
+      <div class="page-title">Weight & BMI</div>
+      <% if (user.googleFitConnected) { %>
+        <form action="/googlefit/sync-weight" method="POST">
+          <button type="submit" class="btn-add" style="font-size:0.85rem;padding:10px 16px">
+            🔄 Sync from Google Fit
+          </button>
+        </form>
+      <% } %>
+    </div>
+
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-title">➕ Log Weight</div>
+        <form action="/weight" method="POST">
+          <div class="form-group">
+            <label>Weight (kg)</label>
+            <input type="number" name="value" step="0.1" min="1" required>
+          </div>
+          <div class="form-group">
+            <label>Date</label>
+            <input type="date" name="date" required>
+          </div>
+          <div class="form-group">
+            <label>Note (optional)</label>
+            <input type="text" name="note">
+          </div>
+          <button type="submit" class="btn-add" style="width:100%">Save Entry</button>
+        </form>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">📏 BMI Status</div>
+        <% if (weights.length > 0) {
+            const latest   = weights[weights.length - 1];
+            const bmi      = calcBMI(latest.value);
+            const cat      = bmiCat(bmi);
+            const bmiColors = { 'Underweight':'#00b4d8','Normal':'var(--accent)','Overweight':'var(--amber)','Obese':'var(--red)' };
+            const bmiColor  = bmiColors[cat] || 'var(--accent)';
+            const pct = bmi ? Math.min(Math.max((bmi/40)*100, 5), 95) : 0;
+        %>
+        <div class="bmi-display">
+          <div class="bmi-circle" style="background:conic-gradient(<%= bmiColor %> <%= pct %>%, var(--surface) 0)">
+            <div class="bmi-inner">
+              <div class="bmi-num" style="color:<%= bmiColor %>"><%= bmi || '—' %></div>
+              <div class="bmi-cat"><%= cat %></div>
+            </div>
+          </div>
+          <div style="margin-top:10px;color:var(--muted);font-size:0.85rem">
+            Based on: <strong style="color:var(--text)"><%= latest.value %> kg</strong>
+            <% if (latest.source === 'google_fit') { %>
+              <span class="badge badge-green" style="margin-left:6px;font-size:0.72rem">Google Fit</span>
+            <% } %>
+          </div>
+        </div>
+        <% } else { %>
+          <div class="empty-state"><span>⚖️</span>Log weight to see BMI</div>
+        <% } %>
+        <div class="bmi-legend">
+          <span style="color:#00b4d8">◼ Underweight &lt;18.5</span>
+          <span style="color:var(--accent)">◼ Normal 18.5–24.9</span>
+          <span style="color:var(--amber)">◼ Overweight 25–29.9</span>
+          <span style="color:var(--red)">◼ Obese ≥30</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:20px">
+      <div class="panel-title">📈 Weight History</div>
+      <div class="chart-wrap" style="height:220px"><canvas id="chart-weight"></canvas></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">📋 Weight Log</div>
+      <% if (!weights.length) { %>
+        <div class="empty-state"><span>⚖️</span>No entries yet.</div>
+      <% } else { %>
+        <div style="overflow-x:auto">
+          <table class="data-table">
+            <thead><tr><th>Date</th><th>Weight</th><th>Change</th><th>BMI</th><th>Category</th><th>Source</th><th>Note</th><th></th></tr></thead>
+            <tbody>
+              <% const sorted = [...weights].reverse();
+                 sorted.forEach((w, i) => {
+                   const bmi  = calcBMI(w.value);
+                   const cat  = bmiCat(bmi);
+                   const prev = sorted[i+1];
+                   const chg  = prev ? (w.value - prev.value).toFixed(1) : null;
+                   const chCol = !chg ? 'var(--muted)' : chg > 0 ? 'var(--red)' : 'var(--accent)';
+                   const catMap = {'Underweight':'badge-green','Normal':'badge-green','Overweight':'badge-amber','Obese':'badge-red'};
+              %>
+              <tr>
+                <td><%= new Date(w.date).toLocaleDateString() %></td>
+                <td><strong><%= w.value %></strong> kg</td>
+                <td style="color:<%= chCol %>"><%= chg ? (chg > 0 ? '+'+chg : chg)+' kg' : '—' %></td>
+                <td><strong><%= bmi || '—' %></strong></td>
+                <td><span class="badge <%= catMap[cat]||'badge-green' %>"><%= cat %></span></td>
+                <td>
+                  <% if (w.source === 'google_fit') { %>
+                    <span class="badge badge-green" style="font-size:0.72rem">Google Fit</span>
+                  <% } else { %>
+                    <span style="color:var(--muted);font-size:0.8rem">Manual</span>
+                  <% } %>
+                </td>
+                <td style="color:var(--muted)"><%= w.note || '—' %></td>
+                <td>
+                  <form action="/weight/<%= w._id %>?_method=DELETE" method="POST">
+                    <button type="submit" class="btn-danger" onclick="return confirm('Remove?')">✕</button>
+                  </form>
+                </td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+
+  </main>
+</div>
+<script>
+  const weightLabels = <%- JSON.stringify(weights.map(w => new Date(w.date).toLocaleDateString())) %>;
+  const weightValues = <%- JSON.stringify(weights.map(w => w.value)) %>;
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="/js/weight.js"></script>
+<%- include('partials/footer') %>

@@ -1,0 +1,45 @@
+<nav class="sidebar">
+  <div class="sidebar-logo">FitLive</div>
+
+  <a href="/dashboard" class="nav-item <%= page === 'dashboard' ? 'active' : '' %>">
+    <span class="nav-icon">📊</span> Dashboard
+  </a>
+  <a href="/diet" class="nav-item <%= page === 'diet' ? 'active' : '' %>">
+    <span class="nav-icon">🥗</span> Diet Tracker
+  </a>
+  <a href="/workout" class="nav-item <%= page === 'workout' ? 'active' : '' %>">
+    <span class="nav-icon">🏋️</span> Workout Tracker
+  </a>
+  <a href="/weight" class="nav-item <%= page === 'weight' ? 'active' : '' %>">
+    <span class="nav-icon">⚖️</span> Weight & BMI
+  </a>
+  <a href="/goals" class="nav-item <%= page === 'goals' ? 'active' : '' %>">
+    <span class="nav-icon">🎯</span> Goals
+  </a>
+
+
+  <a href="/ai/coach" class="nav-item <%= page === 'coach' ? 'active' : '' %>" style="position:relative">
+    <span class="nav-icon">🤖</span> AI Coach
+    <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:var(--accent);color:#000;font-size:.6rem;font-weight:700;padding:2px 6px;border-radius:10px">NEW</span>
+  </a>
+
+  <div class="nav-divider"></div>
+
+  <a href="/googlefit" class="nav-item <%= page === 'googlefit' ? 'active' : '' %>" style="position:relative">
+    <span class="nav-icon">❤️</span> Google Fit
+    <% if (user && user.googleFitConnected) { %>
+      <span class="gfit-dot"></span>
+    <% } %>
+  </a>
+
+  <div class="sidebar-bottom">
+    <div class="user-chip">
+      <div class="avatar"><%= user.name.charAt(0).toUpperCase() %></div>
+      <div class="user-info">
+        <div class="user-name"><%= user.name %></div>
+        <div class="user-email"><%= user.email %></div>
+      </div>
+    </div>
+    <a href="/logout" class="btn-logout">🚪 Logout</a>
+  </div>
+</nav>

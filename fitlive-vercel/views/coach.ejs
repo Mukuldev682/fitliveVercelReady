@@ -1,0 +1,247 @@
+<%- include('partials/header', { title: 'AI Coach' }) %>
+<div class="app-layout">
+  <%- include('partials/sidebar') %>
+  <main class="main-content">
+    <%- include('partials/flash') %>
+
+    <div class="page-header">
+      <div class="page-title">🤖 AI Fitness Coach</div>
+      <div class="badge-live"><span class="pulse-dot"></span>AI POWERED</div>
+    </div>
+
+
+    
+    <!-- Quick Stats Bar -->
+    <div class="ai-context-bar">
+      <div class="ai-ctx-item">🔥 <strong><%= stats.todayCals %></strong> kcal today</div>
+      <div class="ai-ctx-item">💪 <strong><%= stats.workoutsToday %></strong> workouts</div>
+      <div class="ai-ctx-item">⚖️ <strong><%= stats.latestWeight ? stats.latestWeight + ' kg' : '—' %></strong></div>
+      <div class="ai-ctx-item">🎯 <strong><%= stats.goals.length %></strong> active goals</div>
+      <div class="ai-ctx-divider"></div>
+      <div style="font-size:.78rem;color:var(--muted)">Coach has access to your real data</div>
+    </div>
+
+    <div class="coach-layout">
+      <!-- ── Chat Panel ── -->
+      <div class="panel chat-panel">
+        <div class="panel-title">💬 Chat with your Coach</div>
+
+        <!-- Chat messages -->
+        <div class="chat-messages" id="chat-messages">
+          <div class="chat-msg ai">
+            <div class="chat-avatar">🤖</div>
+            <div class="chat-bubble">
+              Hi <strong><%= user.name.split(' ')[0] %></strong>! 👋 I'm your personal AI Fitness Coach.
+              I can see your real stats — you've had <strong><%= stats.todayCals %> kcal</strong> today
+              and completed <strong><%= stats.workoutsToday %> workout(s)</strong>.
+              <br><br>
+              Ask me anything about your fitness journey! I'm here to help with personalized advice based on your data.
+            </div>
+          </div>
+        </div>
+
+        <!-- Input -->
+        <div class="chat-input-row">
+          <input
+            type="text"
+            id="chat-input"
+            class="chat-input"
+            placeholder="Ask your fitness coach anything..."
+            autocomplete="off"
+          >
+          <button class="chat-send-btn" id="chat-send" onclick="sendMessage()">
+            <span id="send-icon">➤</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ── Right Panel: Summary + Anomalies ── -->
+      <div class="ai-right-panel">
+
+        <!-- Weekly Summary -->
+        <div class="panel" style="margin-bottom:20px">
+          <div class="panel-title">📊 Weekly AI Summary</div>
+          <div id="summary-content" class="summary-placeholder">
+            <p style="color:var(--muted);font-size:.88rem">Click below to generate your personalised weekly health summary.</p>
+          </div>
+          <button class="btn-add" style="width:100%;margin-top:14px" id="summary-btn" onclick="generateSummary()">
+            ✨ Generate Summary
+          </button>
+        </div>
+
+        <!-- Anomaly Alerts -->
+        <div class="panel">
+          <div class="panel-title">⚠️ Health Alerts</div>
+          <div id="anomaly-content">
+            <div style="text-align:center;padding:16px;color:var(--muted);font-size:.85rem">
+              <div style="font-size:1.5rem;margin-bottom:6px">🔍</div>
+              Loading health analysis...
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ── Conversation history ─────────────────────────────
+let chatHistory = [];
+let isTyping    = false;
+
+// ── Send a message ───────────────────────────────────
+async function sendMessage() {
+  const input   = document.getElementById('chat-input');
+  const message = input.value.trim();
+  if (!message || isTyping) return;
+
+  input.value = '';
+  appendMessage('user', message);
+  chatHistory.push({ role: 'user', content: message });
+
+  showTyping();
+
+  try {
+    const res = await fetch('/ai/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, history: chatHistory.slice(-10) })
+    });
+
+    const data = await res.json();
+    hideTyping();
+
+    if (data.error) {
+      appendMessage('ai', '⚠️ ' + data.error, true);
+    } else {
+      appendMessage('ai', data.reply);
+      chatHistory.push({ role: 'assistant', content: data.reply });
+    }
+  } catch (err) {
+    hideTyping();
+    appendMessage('ai', '⚠️ Network error. Please check your connection.', true);
+  }
+}
+
+// ── Quick question shortcut ──────────────────────────
+function askQuick(question) {
+  document.getElementById('chat-input').value = question;
+  sendMessage();
+}
+
+// ── Append message to chat ───────────────────────────
+function appendMessage(role, text, isError = false) {
+  const container = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = `chat-msg ${role}`;
+
+  // Convert markdown-like bullet points to HTML
+  const html = text
+    .replace(/\n\n/g, '<br><br>')
+    .replace(/\n- /g, '<br>• ')
+    .replace(/\n\* /g, '<br>• ')
+    .replace(/\n/g, '<br>');
+
+  div.innerHTML = `
+    <div class="chat-avatar">${role === 'ai' ? '🤖' : '👤'}</div>
+    <div class="chat-bubble ${isError ? 'error-bubble' : ''}">${html}</div>
+  `;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+// ── Typing indicator ─────────────────────────────────
+function showTyping() {
+  isTyping = true;
+  document.getElementById('send-icon').textContent = '⏳';
+  document.getElementById('chat-send').disabled = true;
+
+  const container = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.id = 'typing-indicator';
+  div.className = 'chat-msg ai';
+  div.innerHTML = '<div class="chat-avatar">🤖</div><div class="chat-bubble typing-bubble"><span></span><span></span><span></span></div>';
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function hideTyping() {
+  isTyping = false;
+  document.getElementById('send-icon').textContent = '➤';
+  document.getElementById('chat-send').disabled = false;
+  const el = document.getElementById('typing-indicator');
+  if (el) el.remove();
+}
+
+// ── Enter key to send ────────────────────────────────
+document.getElementById('chat-input').addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') sendMessage();
+});
+
+// ── Generate Weekly Summary ──────────────────────────
+async function generateSummary() {
+  const btn     = document.getElementById('summary-btn');
+  const content = document.getElementById('summary-content');
+
+  btn.textContent = '⏳ Generating...';
+  btn.disabled    = true;
+  content.innerHTML = '<div style="color:var(--muted);font-size:.85rem;padding:8px">Analysing your week...</div>';
+
+  try {
+    const res  = await fetch('/ai/summary');
+    const data = await res.json();
+
+    if (data.error) {
+      content.innerHTML = `<div class="ai-error">${data.error}</div>`;
+    } else {
+      content.innerHTML = `
+        <div class="summary-text">${data.summary.replace(/\n/g, '<br>')}</div>
+        <div class="summary-time">Generated: ${data.generatedAt}</div>
+      `;
+    }
+  } catch (err) {
+    content.innerHTML = '<div class="ai-error">Network error. Please try again.</div>';
+  }
+
+  btn.textContent = '🔄 Regenerate';
+  btn.disabled    = false;
+}
+
+// ── Load Anomalies on page load ───────────────────────
+async function loadAnomalies() {
+  const container = document.getElementById('anomaly-content');
+  try {
+    const res  = await fetch('/ai/anomalies');
+    const data = await res.json();
+
+    if (!data.anomalies || data.anomalies.length === 0) {
+      container.innerHTML = `
+        <div style="text-align:center;padding:16px;color:var(--accent)">
+          <div style="font-size:1.5rem;margin-bottom:6px">✅</div>
+          <div style="font-size:.88rem">All metrics look healthy!</div>
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = data.anomalies.map(a => `
+      <div class="anomaly-item severity-${a.severity}">
+        <span class="anomaly-icon">${a.icon}</span>
+        <div class="anomaly-text">
+          <div class="anomaly-severity">${a.severity.toUpperCase()}</div>
+          <div>${a.message}</div>
+        </div>
+      </div>
+    `).join('');
+
+  } catch (err) {
+    container.innerHTML = '<div style="color:var(--muted);font-size:.85rem;padding:8px">Could not load health alerts.</div>';
+  }
+}
+
+// Load anomalies when page opens
+loadAnomalies();
+</script>
+
+<%- include('partials/footer') %>

@@ -1,0 +1,124 @@
+<%- include('partials/header', { title: 'Google Fit' }) %>
+<div class="app-layout">
+  <%- include('partials/sidebar') %>
+  <main class="main-content">
+    <%- include('partials/flash') %>
+
+    <div class="page-header">
+      <div class="page-title">Google Fit</div>
+      <% if (user.googleFitConnected) { %>
+        <div class="badge-live gfit"><span class="pulse-dot"></span>CONNECTED</div>
+      <% } %>
+    </div>
+
+    <!-- Connection Status - Centered -->
+    <div class="panel" style="max-width:600px;margin:0 auto;">
+      <div class="panel-title">🔗 Google Fit Connection</div>
+
+      <% if (user.googleFitConnected) { %>
+        <div class="gfit-status connected" style="text-align:center;padding:30px 20px;">
+          <div class="gfit-status-icon" style="font-size:3rem;margin-bottom:15px;">✓</div>
+          <div>
+            <div class="gfit-status-title">Google Fit Connected</div>
+            <div class="gfit-status-sub">
+              <% if (user.googleEmail) { %>
+                Syncing from: <strong><%= user.googleEmail %></strong>
+              <% } else { %>
+                Live health data is active
+              <% } %>
+            </div>
+          </div>
+        </div>
+
+        <div class="gfit-streams" style="margin-top:20px;">
+          <div class="gfit-stream-title" style="text-align:center;margin-bottom:15px;">Active Data Streams</div>
+          <div class="gfit-stream-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:15px;">
+            <div style="text-align:center;padding:15px;border:1px solid var(--border);border-radius:8px;">
+              <div style="font-size:2rem;margin-bottom:5px;">❤️</div>
+              <div>Heart Rate</div>
+              <div class="rt-value red" id="gf-hr" style="font-size:1.5rem;font-weight:bold;">—</div>
+              <div>bpm</div>
+            </div>
+            <div style="text-align:center;padding:15px;border:1px solid var(--border);border-radius:8px;">
+              <div style="font-size:2rem;margin-bottom:5px;">👣</div>
+              <div>Daily Steps</div>
+              <div class="rt-value green" id="gf-steps" style="font-size:1.5rem;font-weight:bold;">—</div>
+              <div>steps</div>
+            </div>
+            <div style="text-align:center;padding:15px;border:1px solid var(--border);border-radius:8px;">
+              <div style="font-size:2rem;margin-bottom:5px;">🔥</div>
+              <div>Calories</div>
+              <div class="rt-value amber" id="gf-burn" style="font-size:1.5rem;font-weight:bold;">—</div>
+              <div>kcal</div>
+            </div>
+            <div style="text-align:center;padding:15px;border:1px solid var(--border);border-radius:8px;">
+              <div style="font-size:2rem;margin-bottom:5px;">⚖️</div>
+              <div>Weight</div>
+              <div class="rt-value blue" id="gf-weight" style="font-size:1.5rem;font-weight:bold;">—</div>
+              <div>kg</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="text-align:center;margin:30px 0;">
+          <form action="/googlefit/sync-weight" method="POST">
+            <button type="submit" class="btn-add" style="font-size:0.85rem">⚖️ Import Weight</button>
+          </form>
+          <a href="/googlefit/disconnect"
+             onclick="return confirm('Disconnect Google Fit?')"
+             class="btn-logout" style="display:inline-block;padding:10px 16px;width:auto;border-radius:8px;font-size:0.85rem;text-decoration:none">
+            🔌 Disconnect
+          </a>
+        </div>
+
+      <% } else { %>
+        <div class="gfit-status disconnected" style="text-align:center;padding:30px 20px;">
+          <div class="gfit-status-icon dim" style="font-size:3rem;margin-bottom:15px;">○</div>
+          <div>
+            <div class="gfit-status-title" style="color:var(--muted);font-size:1.2rem;">Not Connected</div>
+            <div class="gfit-status-sub" style="color:var(--muted);">Currently using simulated data</div>
+          </div>
+        </div>
+
+        <div style="text-align:center;margin:30px 0;">
+          <% if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_ID !== 'YOUR_GOOGLE_CLIENT_ID_HERE') { %>
+            <a href="/googlefit/connect" class="btn-primary" style="display:inline-block;text-decoration:none;padding:15px 30px;">
+              🔗 Connect Google Fit
+            </a>
+          <% } else { %>
+            <div class="alert alert-error" style="max-width:400px;margin:0 auto;">
+              ⚠️ <strong>Google credentials not configured.</strong><br>
+              Open your <code>.env</code> file and add your GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.
+            </div>
+          <% } %>
+        </div>
+
+        <p style="color:var(--muted);font-size:0.9rem;line-height:1.8;text-align:center;margin:20px 0;">
+          Connect your Google Fit account to pull <strong style="color:var(--text)">real health data</strong> —
+          heart rate, step count, calories burned, and weight directly into your FitLive dashboard.
+        </p>
+      <% } %>
+    </div>
+
+  </main>
+</div>
+
+<% if (user.googleFitConnected) { %>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const socket = io();
+  socket.emit('register-user', '<%= user._id %>');
+  socket.on('health-data', (data) => {
+    const set = (id, val) => { if (document.getElementById(id) && val != null) document.getElementById(id).textContent = val; };
+    set('gf-hr',     data.heartRate);
+    set('gf-steps',  data.steps != null ? Number(data.steps).toLocaleString() : null);
+    set('gf-burn',   data.caloriesBurned);
+    set('gf-weight', data.weight ? data.weight + ' kg' : null);
+    const ts = document.getElementById('gf-timestamp');
+    if (ts) ts.textContent = '⏱ Updated: ' + data.timestamp +
+      ' · Source: ' + (data.source === 'google_fit' ? '🟢 Google Fit' : '🔵 Simulated');
+  });
+</script>
+<% } %>
+
+<%- include('partials/footer') %>

@@ -1,0 +1,126 @@
+<%- include('partials/header', { title: 'Workout Tracker' }) %>
+<div class="app-layout">
+  <%- include('partials/sidebar') %>
+  <main class="main-content">
+    <%- include('partials/flash') %>
+
+    <div class="page-header"><div class="page-title">Workout Tracker</div></div>
+
+    <div class="panel" style="margin-bottom:20px">
+      <div class="panel-title"> Log Workout</div>
+      <form action="/workout" method="POST">
+        <div class="inline-form">
+          <div class="form-group" style="margin:0">
+            <label>Exercise Name</label>
+            <input type="text" name="exerciseName" required>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label>Type</label>
+            <select name="type" id="w-type">
+              <option value="">Select</option>
+              <option>Cardio</option><option>Strength</option>
+              <option>Flexibility</option><option>HIIT</option>
+              <option>Sports</option><option>Other</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label>Duration (min)</label>
+            <input type="number" name="duration" min="1" required>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label>Calories Burned</label>
+            <input type="number" name="caloriesBurned" min="0">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label>Intensity</label>
+            <select name="intensity" id="w-intensity">
+              <option value="">Select</option>
+              <option>Low</option><option>Medium</option><option>High</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label>Notes</label>
+            <input type="text" name="notes">
+          </div>
+          <div style="display:flex;align-items:flex-end">
+            <button type="submit" class="btn-add">Log Workout</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <%
+      const today = new Date(); today.setHours(0,0,0,0);
+      const todayWo      = workouts.filter(w => new Date(w.date) >= today);
+      const totalDur     = todayWo.reduce((s,w) => s+w.duration,0);
+      const totalBurned  = todayWo.reduce((s,w) => s+w.caloriesBurned,0);
+    %>
+    <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
+      <div class="stat-card">
+        <div class="stat-label">Today's Sessions</div>
+        <div class="stat-value green"><%= todayWo.length %></div>
+        <div class="stat-unit">workouts</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Duration</div>
+        <div class="stat-value blue"><%= totalDur %></div>
+        <div class="stat-unit">minutes</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Calories Burned</div>
+        <div class="stat-value amber"><%= totalBurned %></div>
+        <div class="stat-unit">kcal</div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-title">📋 Workout Log</div>
+        <% if (!workouts.length) { %>
+          <div class="empty-state"><span>🏋️</span>No workouts logged yet.</div>
+        <% } else { %>
+          <div style="overflow-x:auto">
+            <table class="data-table">
+              <thead><tr><th>Exercise</th><th>Type</th><th>Date</th><th>Min</th><th>kcal</th><th>Level</th><th></th></tr></thead>
+              <tbody>
+                <% workouts.forEach(w => {
+                  const ib = w.intensity==='High'?'badge-red':w.intensity==='Medium'?'badge-amber':'badge-green';
+                %>
+                <tr>
+                  <td><strong><%= w.exerciseName %></strong></td>
+                  <td><span class="badge badge-green"><%= w.type %></span></td>
+                  <td style="color:var(--muted);font-size:0.8rem"><%= new Date(w.date).toLocaleDateString() %></td>
+                  <td><%= w.duration %></td>
+                  <td style="color:var(--amber)"><strong><%= w.caloriesBurned %></strong></td>
+                  <td><span class="badge <%= ib %>"><%= w.intensity %></span></td>
+                  <td>
+                    <form action="/workout/<%= w._id %>?_method=DELETE" method="POST">
+                      <button type="submit" class="btn-danger" onclick="return confirm('Remove?')">✕</button>
+                    </form>
+                  </td>
+                </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </div>
+      <div class="panel">
+        <div class="panel-title">⏱ By Type</div>
+        <div class="chart-wrap"><canvas id="chart-wo-type"></canvas></div>
+        <%
+          const types = ['Cardio','Strength','Flexibility','HIIT','Sports','Other'];
+          const typeCounts = types.map(t => workouts.filter(w=>w.type===t).length);
+        %>
+        <script>
+          const woTypeLabels = <%- JSON.stringify(types) %>;
+          const woTypeCounts = <%- JSON.stringify(typeCounts) %>;
+        </script>
+      </div>
+    </div>
+
+  </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="/js/workout.js"></script>
+<%- include('partials/footer') %>

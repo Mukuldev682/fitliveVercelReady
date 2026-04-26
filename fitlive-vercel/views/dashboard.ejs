@@ -1,0 +1,205 @@
+<%- include('partials/header', { title: 'Dashboard' }) %>
+<div class="app-layout">
+  <%- include('partials/sidebar') %>
+  <main class="main-content">
+    <%- include('partials/flash') %>
+
+    <div class="page-header">
+      <div class="page-title">Dashboard</div>
+      <div class="header-badges">
+        <% if (user.googleFitConnected) { %>
+          <div class="badge-live gfit">
+            <span class="pulse-dot"></span>
+            Google Fit Live
+          </div>
+        <% } else { %>
+          <a href="/googlefit" class="badge-live sim" style="text-decoration:none">
+            🔌 Connect Google Fit
+          </a>
+        <% } %>
+        <div class="badge-live"><span class="pulse-dot"></span>LIVE</div>
+      </div>
+    </div>
+
+    <!-- ── Stat Cards ── -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">🔥</div>
+        <div class="stat-label">Calories Today</div>
+        <div class="stat-value amber"><%= todayCals %></div>
+        <div class="stat-unit">kcal consumed</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">💪</div>
+        <div class="stat-label">Workouts Today</div>
+        <div class="stat-value green"><%= workouts.length %></div>
+        <div class="stat-unit">sessions logged</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⚖️</div>
+        <div class="stat-label">Current Weight</div>
+        <div class="stat-value blue"><%= latestWeight ? latestWeight + ' kg' : '—' %></div>
+        <div class="stat-unit">last logged</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">📏</div>
+        <div class="stat-label">BMI</div>
+        <div class="stat-value green"><%= bmi || '—' %></div>
+        <div class="stat-unit"><%= bmiCat %></div>
+      </div>
+    </div>
+
+    <!-- ── Charts Row ── -->
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-title">📈 Weekly Calories</div>
+        <div class="chart-wrap"><canvas id="chart-calories"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">
+          💓 Live Health
+          <span id="data-source-label" class="source-label">
+            <%= user.googleFitConnected ? '🟢 Google Fit' : '🔵 Simulated' %>
+          </span>
+        </div>
+        <div class="rt-grid">
+          <div class="rt-card">
+            <div class="rt-value red" id="rt-hr">—</div>
+            <div class="rt-label">Heart Rate<br><small>bpm</small></div>
+          </div>
+          <div class="rt-card">
+            <div class="rt-value green" id="rt-steps">—</div>
+            <div class="rt-label">Steps<br><small>today</small></div>
+          </div>
+          <div class="rt-card">
+            <div class="rt-value amber" id="rt-burn">—</div>
+            <div class="rt-label">Burned<br><small>kcal</small></div>
+          </div>
+        </div>
+        <div class="chart-wrap" style="height:110px;margin-top:10px">
+          <canvas id="chart-hr-mini"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Goals + Meals ── -->
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-title">🎯 Active Goals</div>
+        <% if (!goals.length) { %>
+          <div class="empty-state"><span>🎯</span>No goals yet. <a href="/goals">Set one</a></div>
+        <% } else { %>
+          <% goals.slice(0,4).forEach(g => { %>
+          <div style="margin-bottom:14px">
+            <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:5px">
+              <span><strong><%= g.title %></strong></span>
+              <span style="color:var(--accent)"><%= g.currentValue %> → <%= g.targetValue %> <%= g.unit %></span>
+            </div>
+            <div class="progress-wrap"><div class="progress-fill" style="width:0%"></div></div>
+            <% if (g.deadline) { %>
+              <div style="font-size:0.73rem;color:var(--muted);margin-top:3px">Due: <%= new Date(g.deadline).toDateString() %></div>
+            <% } %>
+          </div>
+          <% }) %>
+        <% } %>
+      </div>
+      <div class="panel">
+        <div class="panel-title">🥗 Today's Meals</div>
+        <% if (!meals.length) { %>
+          <div class="empty-state"><span>🥗</span>No meals today. <a href="/diet">Add one</a></div>
+        <% } else { %>
+          <table class="data-table">
+            <thead><tr><th>Meal</th><th>Type</th><th>kcal</th></tr></thead>
+            <tbody>
+              <% meals.slice(0,5).forEach(m => { %>
+              <tr>
+                <td><strong><%= m.mealName %></strong></td>
+                <td><span class="badge badge-green"><%= m.category %></span></td>
+                <td style="color:var(--amber)"><strong><%= m.calories %></strong></td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+      </div>
+    </div>
+
+    <!-- ── Full Live HR Monitor ── -->
+    <div class="panel" id="monitor">
+      <div class="panel-title">
+        💓 Live Heart Rate Monitor
+        <span class="badge-live" style="font-size:0.72rem;padding:4px 10px;margin-left:8px">
+          <span class="pulse-dot"></span>
+          <%= user.googleFitConnected ? 'GOOGLE FIT' : 'STREAMING' %>
+        </span>
+      </div>
+      <div class="chart-wrap" style="height:200px">
+        <canvas id="chart-hr-live"></canvas>
+      </div>
+      <p style="color:var(--muted);font-size:0.82rem;margin-top:10px">
+        <% if (user.googleFitConnected) { %>
+          ⚡ Pulling real data from <strong style="color:var(--accent)">Google Fit API</strong> via Socket.io WebSocket.
+          <a href="/googlefit" style="color:var(--accent)">Manage connection →</a>
+        <% } else { %>
+          🔵 Simulated data active. <a href="/googlefit" style="color:var(--accent)">Connect Google Fit</a> for real health metrics.
+        <% } %>
+      </p>
+    </div>
+
+
+    <!-- ── AI Health Alerts (loads dynamically) ── -->
+    <div id="ai-alerts-container" style="margin-top:0"></div>
+
+    <!-- ── AI Coach Quick Access ── -->
+    <div class="panel ai-cta-panel" style="margin-top:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:1.5px">🤖 AI FITNESS COACH</div>
+          <div style="color:var(--muted);font-size:.88rem;margin-top:2px">
+            Get personalised advice, auto-fill meal nutrition, and weekly health summaries
+          </div>
+        </div>
+        <a href="/ai/coach" class="btn-add" style="text-decoration:none;white-space:nowrap">
+          Chat with Coach →
+        </a>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  const last7Labels   = <%- JSON.stringify(last7.map(d => d.date)) %>;
+  const last7Cals     = <%- JSON.stringify(last7.map(d => d.cals)) %>;
+  const currentUserId = '<%= user._id %>';
+</script>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+
+  // ── Load AI anomaly alerts on dashboard ─────────
+  (async function() {
+    try {
+      const res  = await fetch('/ai/anomalies');
+      const data = await res.json();
+      const container = document.getElementById('ai-alerts-container');
+      if (!container) return;
+      if (!data.anomalies || data.anomalies.length === 0) return;
+      
+      const html = data.anomalies.map(a => `
+        <div class="anomaly-banner severity-${a.severity}">
+          <span style="font-size:1.2rem">${a.icon}</span>
+          <div>
+            <strong>${a.severity.charAt(0).toUpperCase() + a.severity.slice(1)}:</strong>
+            ${a.message}
+          </div>
+          <button onclick="this.parentElement.remove()" style="background:none;border:none;color:inherit;cursor:pointer;margin-left:auto;font-size:1rem">✕</button>
+        </div>
+      `).join('');
+      
+      container.innerHTML = html;
+    } catch(e) { /* silent fail */ }
+  })();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="/js/dashboard.js"></script>
+<%- include('partials/footer') %>
